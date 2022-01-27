@@ -5,39 +5,238 @@
 #define velocidade 3
 
 LiquidCrystal lcd(12,11,7,6,5,4);
-//led dbg
-int pld0 = 12, pld1 = 11;//0 verde, 1 vermelho
 
-//potenciometro
-int ppot = A2;
-float potread;
-int potmap;
+//botoes e variaveis de sinalizacao
+int pbot_status_motor_ldr = 8;
+int pbot_status_higro = 2;
+int pbot_status_nivela = 3;
+int funcao_A = 0; 
+int funcao_A1 = 0;
+int funcao_B = 0; 
+int funcao_C = 0; 
 
-//botao
-int pbot = 8;
-
-int ligar = 0; 
+//variaveis do higrometro
+int phigro_D = 13;
+int phigro_A = A5;
+float leitura_hig;
 
 //variaveis do servo
 int ps0 = 9;
 int ps1 = 10;
-Servo s0;
-Servo s1;
+Servo s0; //servo 0
+Servo s1; //servo 1
 int s0read;
 int s1read;
 
-//angulo de deslocamento
-int ang;
-//ldr
+//variaveis do sensor de luminosidade (ldr)
 int pldr0 = A0;
 int pldr1 = A1;
-float ldr0=0, ldr1=0;
+int pldrC = A2;
+int pldrB = A3;
+int ldr0=0, ldr1=0, ldrC, ldrB;
+
+//angulo de deslocamento
+int ang0, ang1;
+
+
+
+
+
+//funcoes
+
+//Interpretação dos estados dos botoes
+void leitura_botoes(){
+   //Esta funcao altera as variaveis que indicam qual tarefa esta sendo executada
+   //
+   // Funcao A: inicia e para a tarefa de posicionamento do painel e exibe as leituras dos sensores de luz no lcd
+   // Funcao A1: mesma que A mas exibe a posição dos motores
+   // Funcao B: inicia e para a tarefa de leitura do sensor de umidade, e exibe a leitura no lcd
+   //
+   
+  if(digitalRead(pbot_status_motor_ldr) == 1 && digitalRead(pbot_status_higro) == 1 && digitalRead(pbot_status_nivela) == 0){
+    if(funcao_A1 == 0){
+      funcao_A1 = 1;
+      funcao_A = 0;
+      funcao_B = 0;
+      funcao_C = 0;
+      Serial.println("funcao A1");
+    }else if(funcao_A1 == 1){
+      funcao_A1 = 0;
+    }
+
+    delay(500);
+  }
+  else if(digitalRead(pbot_status_motor_ldr) == 1 && digitalRead(pbot_status_higro) == 0 && digitalRead(pbot_status_nivela) == 0){
+    if(funcao_A == 0){
+      //liga
+      funcao_A = 1;
+      funcao_A1 = 0;
+      funcao_B = 0;
+      funcao_C = 0;
+      Serial.println("funcao A");
+    }else if(funcao_A == 1){
+      //desliga
+      s0.write(90);
+      s1.write(20);
+      funcao_A = 0;
+      
+    }
+    delay(500);// delay adicionado para evitar que ligar fique em 1
+  }
+  else if(digitalRead(pbot_status_higro) == 1 && digitalRead(pbot_status_motor_ldr) == 0 && digitalRead(pbot_status_nivela) == 0){
+    if(funcao_B == 0){
+      //liga
+      funcao_A = 0;
+      funcao_A1 = 0;
+      funcao_B = 1;
+      funcao_C = 0;
+      Serial.println("funcao B");
+    }else if(funcao_B == 1){
+      //desliga
+      funcao_B = 0;
+    }
+    delay(500);// delay adicionado para evitar que ligar fique em 1
+  }
+  else if(digitalRead(pbot_status_nivela) == 1 && digitalRead(pbot_status_motor_ldr) == 0 && digitalRead(pbot_status_higro) == 0){
+    if(funcao_C == 0){
+      //liga
+      funcao_A = 0;
+      funcao_A1 = 0;
+      funcao_B = 0;
+      funcao_C = 1;
+      Serial.println("funcao C");
+    }else if(funcao_C == 1){
+      //desliga
+      funcao_C = 0;
+    }
+    delay(500);// delay adicionado para evitar que ligar fique em 1
+  }
+}
+
+
+
+void dados_ldr(){
+  lcd.clear();
+  
+  lcd.setCursor(0,0);
+
+  lcd.print(" S0:");
+  lcd.print(ldr0);
+  lcd.print(" S1:");
+  lcd.print(ldr1);
+  
+  lcd.setCursor(0,1);
+  lcd.print(" SC:");
+  lcd.print(ldrC);
+  lcd.print(" SB:");
+  lcd.print(ldrB);
+}
+void dados_motor(){
+  lcd.clear();
+  
+  lcd.setCursor(0,0);
+  lcd.print("X:");
+  lcd.print(s0read);
+  lcd.write(B11011111);//caractere º
+  
+  lcd.setCursor(0,1);
+  lcd.print("Y:");
+  lcd.print(s1read);
+  lcd.write(B11011111);
+}
+
+//funcoes A
+void funcao_botao_amarelo(){
+
+    s0read = s0.read();
+    s1read = s1.read();
+    
+      //leitura do ldr
+    ldr0 = analogRead(pldr0);
+    ldr1 = analogRead(pldr1);
+    ldrC = analogRead(pldrC);
+    ldrB = analogRead(pldrB);
+    
+    //movimento motor servo_0
+    if(ldr0 > (ldr1 + margem)){
+      //esquerda decresce
+      ang0 = s0read - velocidade;
+      s0.write(ang0);
+    }else if(ldr1 > (ldr0 + margem)){
+      //direita cresce
+      ang0 = s0read + velocidade;
+      s0.write(ang0);
+    }
+
+    //movimento motor servo_1
+    if(ldrC > (ldrB + margem)){
+      //pra cima
+      ang1 = s1read - velocidade;
+      s1.write(ang1);
+    }else if(ldrB > (ldrC + margem)){
+      ang1 = s1read + velocidade;
+      if(ang1 <= 40){
+        s1.write(ang1);
+      }
+    }
+
+
+    if(funcao_A == 1){
+      dados_ldr();
+    }else if(funcao_A1 == 1){
+      dados_motor();
+    }
+    
+
+    
+    //saidas terminal
+    Serial.print("leitura ldr0: ");
+    Serial.println(ldr0);
+    Serial.print("leitura ldr1: ");
+    Serial.println(ldr1);
+    Serial.print("leitura ldrC: ");
+    Serial.println(ldrC);
+    Serial.print("leitura ldrB: ");
+    Serial.println(ldrB);
+    Serial.print("Pos S0: ");
+    Serial.println(s0read);
+    Serial.print("Pos S1: ");
+    Serial.println(s1read);
+    delay(100);//200ms
+    Serial.println(" ");
+    
+}
+
+//funcoes B
+void funcao_botao_vermelho(){
+  leitura_hig = analogRead(phigro_A);
+  //220 = agua ; 1023 = ar ; umidade_aceitavel < 620
+  Serial.print("Saida analogica do higrometro: ");
+  Serial.println(leitura_hig);
+  lcd.clear();
+  
+  lcd.setCursor(0,0);
+  lcd.print("Umidade: ");
+  lcd.print(leitura_hig);
+  lcd.setCursor(0,1);
+  if(leitura_hig < 620 && leitura_hig > 400){
+    lcd.print("Hidratada");
+  }else if(leitura_hig > 620){
+    lcd.print("Desidratada");
+  }else if(leitura_hig < 400){
+    lcd.print("Execesso");
+  }
+}
+
+
+
+
 
 void setup() {
   lcd.begin(16,2);
   lcd.print("Pressione o botao amarelo.");
   
-  pinMode(pbot, INPUT);
+  pinMode(pbot_status_motor_ldr, INPUT);
   
   
   //configuracao dos servos
@@ -49,90 +248,41 @@ void setup() {
 
   s1.attach(ps1);
   s1.write(20);
+
+  s0read = s0.read();
+  s1read = s1.read();
   
   //
   Serial.begin(9600);
 }
 
 void loop() {
-    s0read = s0.read();
-    s1read = s1.read();
-  if(digitalRead(pbot) == 1){
-    if(ligar == 0){
-      //liga
-      ligar = 1;
-      Serial.print("Status ligar if: ");
-      Serial.println(ligar);
-    }else if(ligar == 1){
-      //desliga
-      ligar = 0;
-      s0.write(90);
-      s1.write(20);
-      Serial.print("Status ligar if: ");
-      Serial.println(ligar);
-    }
-    delay(500);// delay adicionado para evitar que ligar fique em 1
+    
+
+
+
+
+  leitura_botoes();
+  
+
+
+
+
+  
+  if(funcao_A == 1){
+//funcao do botao amarelo
+    funcao_botao_amarelo();
+  }else if(funcao_A1 == 1){
+    funcao_botao_amarelo();
+  }
+  else if(funcao_B == 1){
+//funcao do botao vermelho
+    funcao_botao_vermelho();
+  }else if(funcao_C == 1){
+//funcao do botao preto
+
   }
   
-      Serial.print("Status ligar: ");
-      Serial.println(ligar);
-  if(ligar == 1){
-    //leitura do pot
-    potread = analogRead(ppot);
-    potmap = map(potread,0,1023,0,180);//mapeando para graus
-    //leitura do ldr
-    ldr0 = analogRead(pldr0);
-    ldr1 = analogRead(pldr1);
-    
+  lcd.clear();
 
-    //movimento motor s0
-    if(ldr0 > (ldr1 + margem)){
-      //esquerda decresce
-      ang = s0read - velocidade;
-      s0.write(ang);
-    }else if(ldr1 > (ldr0 + margem)){
-      //direita cresce
-      ang = s0read + velocidade;
-      s0.write(ang);
-    }
-
-    //movimento motor s1
-    if(potmap <= 20){
-      s1.write(potmap);
-    }
-    
-    //saidas terminal
-    Serial.print("leitura ldr0: ");
-    Serial.println(ldr0);
-    Serial.print("leitura ldr1: ");
-    Serial.println(ldr1);
-    Serial.print("Pos S0: ");
-    Serial.println(s0read);
-    Serial.print("Pos S1: ");
-    Serial.println(s1read);
-    delay(100);//200ms
-    Serial.println(" ");
-
-    
-    
-    
-  }
-    Serial.print("Pos S1: ");
-    Serial.println(s1read);
-    
-    lcd.clear();
-    lcd.setCursor(0,0);
-    lcd.print("X:");
-    lcd.print(s0read);
-    lcd.write(B11011111);//caractere º
-    lcd.print(" S0:");
-    lcd.print(ldr0);
-    lcd.setCursor(0,1);
-    lcd.print("Y:");
-    lcd.print(s1read);
-    lcd.write(B11011111);
-    lcd.print(" S1:");
-    lcd.print(ldr1);
-    
-    
 }
