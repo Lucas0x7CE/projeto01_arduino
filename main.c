@@ -165,7 +165,7 @@ void funcao_primaria(int chamada){
   }else if(funcao_A1 == 1){
     dados_motor();
   }
-  delay(100);//200ms
+  delay(50);//100ms
 }
 
 void funcao_secundaria(){
@@ -186,9 +186,10 @@ void funcao_secundaria(){
     }else if(leitura_hig > 620){
       lcd.print("Desidratada");
     }else if(leitura_hig < 400){
-      lcd.print("Execesso");
+      lcd.print("Excesso");
     }
   }
+  delay(50);//100ms
 }
 
 void resumo(){
@@ -210,6 +211,8 @@ void resumo(){
   }else if(leitura_hig < 400){
     lcd.print("Exc");
   }
+  lcd.setCursor(14,1);
+  lcd.print((decorrido/1000)+1);
 }
 
 void setup() {
@@ -258,6 +261,9 @@ void loop() {
       lcd.print(decorrido/1000);
       lcd.print("/");
       lcd.print(intervalo_tarefa/1000);
+      lcd.setCursor(12,1);
+      lcd.print(leitura_hig,0);
+      delay(50);
     }
 
     if(decorrido >= intervalo_tarefa){
